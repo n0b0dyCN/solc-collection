@@ -60,7 +60,7 @@ jobs:
       
       - name: fetch artifacts
         id: package
-        if: ${{ steps.check_version.outputs.rerun }}
+        if: steps.check_version.outputs.rerun == 'true'
         run: |
           python download_all.py artifacts
           PKG_NAME="artifacts.zip"
@@ -71,14 +71,14 @@ jobs:
           echo "PKG_PATH=${PKG_PATH}" >> $GITHUB_OUTPUT
       
       - name: upload artifacts
-        if: ${{ steps.check_version.outputs.rerun }}
+        if: steps.check_version.outputs.rerun == 'true'
         uses: actions/upload-artifact@v2
         with:
           name: ${{ steps.package.outputs.PKG_NAME }}
           path: ${{ steps.package.outputs.PKG_PATH }}
       
       - name: push commit
-        if: ${{ steps.check_version.outputs.rerun }}
+        if: steps.check_version.outputs.rerun == 'true'
         run: |
           echo ${{ needs.get_version.outputs.version }} > $VERSION_FILE
           git config --global user.name "tianyi.li"
@@ -89,7 +89,7 @@ jobs:
           git push
 
       - name: draft release
-        if: ${{ steps.check_version.outputs.rerun }}
+        if: steps.check_version.outputs.rerun == 'true'
         uses: softprops/action-gh-release@v1
         with:
           tag_name: "v${{ needs.get_version.outputs.version }}"

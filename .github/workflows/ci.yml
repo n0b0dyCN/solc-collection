@@ -1,0 +1,98 @@
+name: CI
+
+on:
+  workflow_dispatch:
+  schedule:
+    - cron: '0 0 * * *'
+  
+
+env:
+  VERSION_FILE: version.txt
+
+jobs:
+  get_version:
+    name: get latest version
+    runs-on: "ubuntu-22.04"
+    outputs:
+      version: ${{ steps.get_latest_version.outputs.version }}
+    steps:
+      - name: install jq
+        run: sudo apt-get install -y jq curl
+      - name: get latest version
+        id: get_latest_version
+        run: |
+          version=$(curl https://binaries.soliditylang.org/linux-amd64/list.json | jq -r '.latestRelease')
+          echo "version=$version" >> "$GITHUB_OUTPUT"
+
+  download_artifacts:
+    name: download artifacts
+    runs-on: "ubuntu-22.04"
+    timeout-minutes: 30
+    needs: get_version
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v4
+        with:
+          python-version: '3.10'
+      
+      - name: install requests
+        run: pip install requests
+      
+      - name: check version
+        id: check_version
+        run: |
+          # get version from $VERSION_FILE
+          version=''
+          if [ -f $VERSION_FILE ]; then
+            version=$(cat $VERSION_FILE)
+          fi
+          current_version=${{ needs.get_version.outputs.version }}
+          if [ "$version" = "$current_version" ]; then
+            echo "already latest version"
+            echo "rerun=false" >> $GITHUB_OUTPUT
+          else
+            echo "find new version: ${current_version}"
+            echo "rerun=true" >> $GITHUB_OUTPUT
+          fi
+      
+      - name: fetch artifacts
+        id: package
+        if: ${{ steps.check_version.outputs.rerun }}
+        run: |
+          python download_all.py artifacts
+          PGK_NAME="artifacts.zip"
+          PGK_PATH=$(readlink -f ./artifacts.zip)
+          echo $PGK_NAME
+          echo $PGK_PATH
+          echo "PKG_NAME=${PKG_NAME}" >> $GITHUB_OUTPUT
+          echo "PKG_PATH=${PGK_PATH}" >> $GITHUB_OUTPUT
+      
+      - name: upload artifacts
+        if: ${{ steps.check_version.outputs.rerun }}
+        uses: actions/upload-artifact@v2
+        with:
+          name: ${{ steps.package.outputs.PKG_NAME }}
+          path: ${{ steps.package.outputs.PKG_PATH }}
+      
+      - name: push commit
+        if: ${{ steps.check_version.outputs.rerun }}
+        run: |
+          echo ${{ needs.get_version.outputs.version }} > $VERSION_FILE
+          git config --global user.name "tianyi.li"
+          git config --global user.email "tianyi.li@certik.com"
+          git add $VERSION_FILE
+          git commit -a -m "update version to ${{ needs.get_version.outputs.version }}"
+          git push
+
+      - name: draft release
+        if: ${{ steps.check_version.outputs.rerun }}
+        uses: softprops/action-gh-release@v1
+        with:
+          body: ${{ needs.get_version.outputs.version }}
+          files: |
+            ${{ steps.package.outputs.PKG_PATH }}
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+
+

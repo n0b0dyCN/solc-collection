@@ -61,12 +61,12 @@ jobs:
         if: ${{ steps.check_version.outputs.rerun }}
         run: |
           python download_all.py artifacts
-          PGK_NAME="artifacts.zip"
-          PGK_PATH=$(readlink -f ./artifacts.zip)
-          echo $PGK_NAME
-          echo $PGK_PATH
+          PKG_NAME="artifacts.zip"
+          PKG_PATH=$(readlink -f ./artifacts.zip)
+          echo $PKG_NAME
+          echo $PKG_PATH
           echo "PKG_NAME=${PKG_NAME}" >> $GITHUB_OUTPUT
-          echo "PKG_PATH=${PGK_PATH}" >> $GITHUB_OUTPUT
+          echo "PKG_PATH=${PKG_PATH}" >> $GITHUB_OUTPUT
       
       - name: upload artifacts
         if: ${{ steps.check_version.outputs.rerun }}
